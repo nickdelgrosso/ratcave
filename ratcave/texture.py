@@ -4,6 +4,7 @@ import pyglet
 import pyglet.gl as gl
 import numpy as np
 from .shader import HasUniforms
+from collections import UserDict
 
 
 class Texture(HasUniforms, BindTargetMixin):
@@ -16,7 +17,13 @@ class Texture(HasUniforms, BindTargetMixin):
     _slot_counter = itertools.count(start=1)
     bindfun = gl.glBindTexture
 
-    def __init__(self, values=None, name='TextureMap', width=1024, height=1024, mipmap=False, **kwargs):
+    def __init__(self, values=None, name='TextureMap', width=1024, height=1024, mipmap=False,
+                 params={gl.GL_TEXTURE_MIN_FILTER: gl.GL_LINEAR, #gl.GL_LINEAR_MIPMAP_LINEAR if mipmap else gl.GL_LINEAR,
+                         gl.GL_TEXTURE_MAG_FILTER: gl.GL_LINEAR,
+                         gl.GL_TEXTURE_WRAP_S: gl.GL_REPEAT,
+                         gl.GL_TEXTURE_WRAP_T: gl.GL_REPEAT,
+                         },
+                 **kwargs):
         """2D Color Texture class. Width and height can be set, and will generate a new OpenGL texture if no id is given."""
         super(Texture, self).__init__(**kwargs)
 
@@ -32,9 +39,12 @@ class Texture(HasUniforms, BindTargetMixin):
             width, height = values.shape[1], values.shape[0]
         self.width = width
         self.height = height
-        with self:
-            self._genTex2D()
-            self._apply_filter_settings()
+
+        self._genTex2D()
+
+        self.params = params
+        self._apply_filter_settings()
+
 
         if type(values) != type(None):
             self.values = values
@@ -113,7 +123,8 @@ class Texture(HasUniforms, BindTargetMixin):
 
     def _genTex2D(self):
         """Creates an empty texture in OpenGL."""
-        gl.glTexImage2D(self.target0, 0, self.internal_fmt, self.width, self.height, 0, self.pixel_fmt, gl.GL_UNSIGNED_BYTE, 0)
+        with self:
+            gl.glTexImage2D(self.target0, 0, self.internal_fmt, self.width, self.height, 0, self.pixel_fmt, gl.GL_UNSIGNED_BYTE, 0)
 
     def generate_mipmap(self):
         if self.mipmap:
@@ -121,16 +132,14 @@ class Texture(HasUniforms, BindTargetMixin):
 
 
     def _apply_filter_settings(self):
-        """Applies some hard-coded texture filtering settings."""
-        # TODO: Allow easy customization of filters
-        if self.mipmap:
-            gl.glTexParameterf(self.target, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR_MIPMAP_LINEAR)
-        else:
-            gl.glTexParameterf(self.target, gl.GL_TEXTURE_MIN_FILTER, gl.GL_LINEAR)
-        gl.glTexParameterf(self.target, gl.GL_TEXTURE_MAG_FILTER, gl.GL_LINEAR)
+        """
+        Applies Texture.params dict to the texture using the glTexParameterf() function.
 
-        gl.glTexParameterf(self.target, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
-        gl.glTexParameterf(self.target, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
+        https://www.khronos.org/registry/OpenGL-Refpages/es2.0/xhtml/glTexParameter.xml
+        """
+        with self:
+            for pname, param in self.params.items():
+                gl.glTexParameterf(self.target, pname, param)
 
     def attach_to_fbo(self):
         """Attach the texture to a bound FBO object, for rendering to texture."""
@@ -152,20 +161,23 @@ class TextureCube(Texture):
     target = gl.GL_TEXTURE_CUBE_MAP
     target0 = gl.GL_TEXTURE_CUBE_MAP_POSITIVE_X
 
-    def __init__(self, name='CubeMap', *args, **kwargs):
+    def __init__(self, name='CubeMap',
+                 params={gl.GL_TEXTURE_MIN_FILTER: gl.GL_LINEAR,
+                         # gl.GL_LINEAR_MIPMAP_LINEAR if mipmap else gl.GL_LINEAR,
+                         gl.GL_TEXTURE_MAG_FILTER: gl.GL_LINEAR,
+                         gl.GL_TEXTURE_WRAP_S: gl.GL_CLAMP_TO_EDGE,
+                         gl.GL_TEXTURE_WRAP_T: gl.GL_CLAMP_TO_EDGE,
+                         gl.GL_TEXTURE_WRAP_R: gl.GL_CLAMP_TO_EDGE,
+                         },
+                 *args, **kwargs):
         """the Color Cube Texture class."""
         try:
-            super(TextureCube, self).__init__(name=name, *args, **kwargs)
+            super(TextureCube, self).__init__(name=name, params=params, *args, **kwargs)
         except gl.lib.GLException as exception:
             if self.height != self.width:
                 raise ValueError("TextureCube's height and width must match each other.")
             else:
                 raise exception
-
-    def _apply_filter_settings(self, *args, **kwargs):
-        super(TextureCube, self)._apply_filter_settings()
-        with self:
-            gl.glTexParameterf(self.target, gl.GL_TEXTURE_WRAP_R, gl.GL_CLAMP_TO_EDGE)
 
     def _genTex2D(self):
         """Generate an empty texture in OpenGL"""
@@ -187,14 +199,16 @@ class DepthTexture(Texture):
     pixel_fmt = gl.GL_DEPTH_COMPONENT
     attachment_point = gl.GL_DEPTH_ATTACHMENT_EXT
 
-    def __init__(self, name='DepthMap', *args, **kwargs):
+    def __init__(self, name='DepthMap',
+                 params={gl.GL_TEXTURE_MIN_FILTER: gl.GL_LINEAR, # gl.GL_LINEAR_MIPMAP_LINEAR if mipmap else gl.GL_LINEAR,
+                         gl.GL_TEXTURE_MAG_FILTER: gl.GL_LINEAR,
+                         gl.GL_TEXTURE_WRAP_S: gl.GL_CLAMP_TO_EDGE,
+                         gl.GL_TEXTURE_WRAP_T: gl.GL_CLAMP_TO_EDGE,
+                         gl.GL_TEXTURE_COMPARE_MODE: gl.GL_COMPARE_REF_TO_TEXTURE,
+                         },
+                 *args, **kwargs):
         """the Color Cube Texture class."""
-        super(DepthTexture, self).__init__(name=name, *args, **kwargs)
-
-    def _apply_filter_settings(self):
-        super(DepthTexture, self)._apply_filter_settings()
-        gl.glTexParameterf(self.target, gl.GL_TEXTURE_COMPARE_MODE, gl.GL_COMPARE_REF_TO_TEXTURE)
-
+        super(DepthTexture, self).__init__(name=name, params=params, *args, **kwargs)
 
 class GrayscaleTexture(Texture):
     internal_fmt = gl.GL_R8
