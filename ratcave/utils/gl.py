@@ -14,7 +14,7 @@ class Enum(int):
         obj.name = name
         return obj
 
-    def __repr__(self):
+    def __str__(self):
         return self.name
 
 for module in [pyglet_gl, pyglet_gl.gl]:
