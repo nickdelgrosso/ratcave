@@ -43,7 +43,7 @@ class Texture(HasUniforms, BindTargetMixin):
         self._genTex2D()
 
         self.params = params
-        self._apply_filter_settings()
+        self.apply_parms()
 
 
         if type(values) != type(None):
@@ -131,7 +131,7 @@ class Texture(HasUniforms, BindTargetMixin):
             gl.glGenerateMipmap(self.target)
 
 
-    def _apply_filter_settings(self):
+    def apply_parms(self):
         """
         Applies Texture.params dict to the texture using the glTexParameterf() function.
 
