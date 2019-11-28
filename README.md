@@ -4,6 +4,7 @@
 
 [![Coverage Status](https://coveralls.io/repos/github/ratcave/ratcave/badge.svg?branch=master)](https://coveralls.io/github/ratcave/ratcave?branch=master)
 
+This is a test!
 
 
 # ratcave
